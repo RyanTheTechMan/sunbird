@@ -424,21 +424,28 @@ pub fn install(image: &Image<'static>) {
       return;
    }
 
-   let polls = found
-      .poll_slots
-      .iter()
-      .map(|&slot| (slot, poll_detour as *const () as usize))
-      .collect::<Vec<_>>();
-   // SAFETY: every poll slot is an aligned `.rdata` vtable entry pointing to
-   // `poll_fn`, and `poll_detour` matches its Rust ABI.
-   match unsafe { image.swap_words(&polls) } {
-      Ok(_) => {
-         log::info!(
-            "discord desktop: hooked HTTP send and {} poll vtable slots",
-            found.poll_slots.len(),
-         );
-      },
-      Err(err) => log::error!("discord desktop: failed to hook HTTP transport: {err}"),
+   // macOS arm64: swapping the `SendFuture::poll` vtable slot crashes the
+   // client (SIGSEGV in `libdiscord`'s HTTP polling) with SIP on, so response
+   // hooks stay off there until the arm64 poll ABI is pinned down.
+   if crate::X86_CODE {
+      let polls = found
+         .poll_slots
+         .iter()
+         .map(|&slot| (slot, poll_detour as *const () as usize))
+         .collect::<Vec<_>>();
+      // SAFETY: every poll slot is an aligned `.rdata` vtable entry pointing to
+      // `poll_fn`, and `poll_detour` matches its Rust ABI.
+      match unsafe { image.swap_words(&polls) } {
+         Ok(_) => {
+            log::info!(
+               "discord desktop: hooked HTTP send and {} poll vtable slots",
+               found.poll_slots.len(),
+            );
+         },
+         Err(err) => log::error!("discord desktop: failed to hook HTTP transport: {err}"),
+      }
+   } else {
+      log::info!("discord desktop: hooked HTTP send (poll hooks off on arm64)");
    }
 }
 
