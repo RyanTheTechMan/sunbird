@@ -516,10 +516,15 @@ pub(crate) fn debug_offsets(
 /// loads the bare name and prints `padding` and `gap`.
 pub fn style_fields(image: &Image<'_>) -> Found<std::collections::HashMap<String, usize>> {
    const NAME: &[u8] = b"StyleRefinement";
-   let mut funcs = image
-      .find_bytes(NAME)
+   let mut names = image.find_bytes(NAME);
+   names.sort_unstable();
+   let Some((&first, &last)) = names.first().zip(names.last()) else {
+      return Err("StyleRefinement Debug matched 0 functions".to_owned());
+   };
+   // Scan code once for all occurrences of the name, then keep only exact references.
+   let mut funcs = arm64::code_refs(image, first..last + 1)
       .into_iter()
-      .flat_map(|name| arm64::code_refs(image, name..name + 1))
+      .filter(|&(_, target)| names.binary_search(&target).is_ok())
       .filter_map(|(site, _)| image.function_containing(site))
       .collect::<Vec<_>>();
    funcs.sort_unstable();
