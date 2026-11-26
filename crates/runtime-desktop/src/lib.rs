@@ -135,8 +135,8 @@ pub fn prepare() -> Result<(), Error> {
    }
    let registry = phoenix_runtime::hook(&image);
    if registry.is_ok() {
-      discord::install(&image);
       if X86_CODE {
+         discord::install(&image);
          accessories::install_optimistic_delete(&image);
       }
    }
@@ -165,7 +165,9 @@ pub fn start(home: PathBuf, bundled: Vec<Plugin>) -> Result<Started, Error> {
    }
    let image = phoenix_runtime::target()?;
    let registry = phoenix_runtime::hook(&image)?;
-   discord::install(&image);
+   if X86_CODE {
+      discord::install(&image);
+   }
    phoenix_runtime::start_hooked(&Desktop, image, registry, home, bundled)
 }
 
